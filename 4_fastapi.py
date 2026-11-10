@@ -4,6 +4,7 @@
 
 from fastapi import FastAPI
 from pydantic import BaseModel
+#from 4_graph import graph
 
 app = FastAPI(title='회의 관리 API')
 
