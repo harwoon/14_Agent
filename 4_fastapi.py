@@ -1,12 +1,18 @@
 # /meeting
 # /summarize
 # uvicorn 4_fastapi:app --reload --port 8000
-
+from contextlib import asynccontextmanager #데코레이터 추가용
 from fastapi import FastAPI
 from pydantic import BaseModel
-#from 4_graph import graph
+from graph import run_meeting_pipeline
+from db import init_db
 
-app = FastAPI(title='회의 관리 API')
+@asynccontextmanager
+async def lifespan(_app: FastAPI): #서버시작될 때 해당 처리를 한 후 시작하도록
+    init_db()
+    yield
+
+app = FastAPI(title='회의 관리 API',lifespan=lifespan)
 
 class MeetingRequest(BaseModel):
     title: str
@@ -15,10 +21,10 @@ class MeetingRequest(BaseModel):
 class SummaryRequest(BaseModel):
     text: str
 
-class AllRequest(BaseModel):
+class PipelineRequest(BaseModel):
     title: str
     people: str
-    text: str
+    notes: str
 
 def make_meeting(title: str, people: str) -> str:
     title = (title or "").strip()
@@ -37,23 +43,6 @@ def summarize(text: str) -> str:
     lines = [ln for ln in text.splitlines() if ln.strip()]
     return f"발화 {len(lines)}줄 / 앞부분: {lines[0][:50] if lines else ''}"
 
-def all(title: str, people: str, text:str) -> str:
-    title = (title or "").strip()
-    if not title:
-        return '제목을 입력하세요'
-
-    names = [p.strip() for p in (people or '').split(',') if p.strip()]
-
-    text = (text or "").strip()
-    if not text:
-        return '회의록이 비어 있습니다.'
-    lines = [ln for ln in text.splitlines() if ln.strip()]
-
-    return (f'### 회의 생성됨\n'
-            f"- 제목: {title}\n"
-            f"- 참가자: {','.join(names) or '(없음)'}"
-            f"발화 {len(lines)}줄 / 앞부분: {lines[0][:50] if lines else ''}")
-
 @app.post('/meeting')
 def create_meeting(request: MeetingRequest):
     return {"result":make_meeting(request.title, request.people)}
@@ -63,5 +52,11 @@ def summarize_meeting(request: SummaryRequest):
     return {"result":summarize(request.text)}
 
 @app.post('/pipeline')
-def all_meeting(request: AllRequest):
-    return {"result":all(request.title, request.people, request.text)}
+def run_pipeline(request: PipelineRequest):
+    return {
+        "result":run_meeting_pipeline(
+            title = request.title,
+            people = request.people,
+            notes = request.notes
+        )
+    }
