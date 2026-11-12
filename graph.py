@@ -104,7 +104,7 @@ def build_meeting_graph():
     graph.add_edge('create_meeting','summarize')
     graph.add_edge('summarize','extract_actions')
     graph.add_edge('extract_actions','compose')
-    graph.add_conditional_edge(
+    graph.add_conditional_edges(
         'compose',route_after_compose, {"save":"save_to_db","end":END}
         )
     graph.add_edge('compose',END)
