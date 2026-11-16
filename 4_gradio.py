@@ -73,7 +73,7 @@ def transcribe_audio(audio)-> str:
         with open(path,'rb') as f: # rb: read binary. 글자는 binary가 아닌 t.
             response = requests.post(
                 f"{API_URL}/transcribe",
-                files = {'files': (Path(path).name, f, "application/octet-stream")},
+                files = {'file': (Path(path).name, f, "application/octet-stream")},
                 timeout=100
             )
         response.raise_for_status()
@@ -93,7 +93,7 @@ def run_audio_pipeline(title:str, people: str, audio) -> str:
             response = requests.post(
                 f"{API_URL}/pipeline_audio",
                 data = {'title':title, 'people': people or ""},
-                files = {'files': (Path(path).name, f, "application/octet-stream")},
+                files = {'file': (Path(path).name, f, "application/octet-stream")},
                 timeout=100
             )    
         response.raise_for_status()

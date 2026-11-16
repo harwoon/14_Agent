@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from graph import run_meeting_pipeline
 from db import (init_db, list_meetings, format_meetings_markdown, get_meeting)
-from asr import asr_status
+from asr import (asr_status, transcribe_file)
 from pathlib import Path
 
 UPLOAD_DIR = Path(__file__).resolve().parent / 'uploads'
@@ -100,7 +100,32 @@ def get_asr_status():
 @app.post('/transcribe')
 async def transcribe_only(file:UploadFile = File(...)):
     path = _save_upload(file)
-    # ...
+    try: # 파일 관련 처리
+        tr = transcribe_file(path)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {
+        "text": tr.text,
+        "mode": tr.mode,
+        "rms": tr.rms,
+        "peak": tr.peak,
+        "skipped_silence": tr.skipped_silence,
+        "detail": tr.detail,
+        "result": (
+            f"### 전사 결과\n\n"
+            f"- 모드: `{tr.mode}`\n"
+            f"- RMS: `{tr.rms:.4f}` / peak: `{tr.peak:.4f}`\n"
+            f"- {tr.detail}\n\n"
+            f"```\n{tr.text or '(빈 결과)'}\n```"
+        ),
+        "markdown": (
+            f"### 전사 결과\n\n"
+            f"- 모드: `{tr.mode}`\n"
+            f"- RMS: `{tr.rms:.4f}` / peak: `{tr.peak:.4f}`\n"
+            f"- {tr.detail}\n\n"
+            f"```\n{tr.text or '(빈 결과)'}\n```"
+        ),
+    }
 
 @app.post('/pipeline_audio')
 async def run_pipeline_audio(
@@ -108,5 +133,27 @@ async def run_pipeline_audio(
     people: str = Form(""),
     file: UploadFile = File(...)
 ):
+
     path = _save_upload(file)
-    # ...
+    try:
+        tr = transcribe_file(path)
+        if not tr.text.strip():
+            raise HTTPException(
+                status_code=400, detail='음성 인식 결과 없음'
+            )
+        result = run_meeting_pipeline(
+            title=title,
+            people=people,
+            notes=tr.text or "",
+            audio_path=str(path)
+        )
+        result['transcript'] = tr.text
+        result['asr_mode'] = tr.mode
+        result['audio_rms'] = tr.rms
+        result['audio_peak'] = tr.peak
+
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail='음성 파이프라인 처리 오류'
+        )

@@ -18,6 +18,33 @@ class MeetingState(TypedDict, total=False):
     summary: str
     actions: str
     result: str
+    meeting_id: int
+    audio_path: str
+    audio_rms:float
+    audio_peak:float
+    asr_mode:str
+    transcript:str
+    asr_detail:str
+
+def _initial_state(title:str, people:str, notes:str="", audio_path:str="")->MeetingState:
+    return{
+        "title":title,
+        "people":people,
+        "notes":notes,
+        "error":"",
+        "meeting_info":"",
+        "summary":"",
+        "actions":"",
+        "result":"",
+        "meeting_id":"",
+        "audio_path": audio_path or "",
+        "audio_rms": 0.0,
+        "audio_peak":0.0,
+        "asr_mode": "",
+        "transcript": "",
+        "asr_detail": ""
+    }
+
 
 def validate_input(state:MeetingState)->MeetingState:
     title = (state.get('title') or "").strip()
@@ -113,17 +140,13 @@ def build_meeting_graph():
 
 meeting_app = build_meeting_graph()
 
-def run_meeting_pipeline(title:str, people:str, notes:str)->str: # 그래프에 쓰일 함수
-    final_state = meeting_app.invoke(
-        {
-            'title':title, 
-            'people':people,
-            'notes':notes,
-            'error':'',
-            'meeting_info':"",
-            "summary":"",
-            "actions":"",
-            "result":""
-        }
-    )
-    return final_state['result']
+def run_meeting_pipeline(title:str, people:str, notes:str="", audio_path:str="")->dict: # 그래프에 쓰일 함수
+    final_state = meeting_app.invoke(_initial_state(title=title,people=people,notes=notes,audio_path=audio_path))
+    return {
+        "result":final_state['result'],
+        "meeting_id":final_state.get("meeting_id") or 0,
+        "asr_mode":final_state.get("asr_mode") or "",
+        "transcript": final_state.get('transcript') or "",
+        'notes': final_state.get('notes') or "",
+        'audio_rms': final_state.get('audio_rms') or 0.0
+    }
